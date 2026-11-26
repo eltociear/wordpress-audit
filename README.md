@@ -91,7 +91,18 @@ Demotions:
 
 ## Calibrated, not noisy
 
-RESULTS_TABLE
+Measured on **2,000 WordPress.org plugins** (the top 2,000 by active installs, 10M+ down to 10k):
+
+| | Flagged HIGH/CRITICAL |
+| --- | --- |
+| Naive rules (any `eval(` / `base64_decode(` / `system(` / `wp_insert_user(` / `all_plugins` / `pre_user_query` / `wp_set_auth_cookie(` / `DB_PASSWORD` / raw IP / collector host) | 704 / 1,200 (58.7%) |
+| Calibrated engine, calibration set (top 1,200) | 17 during tuning -> **0 / 1,200** |
+| Calibrated engine, **held-out** set (next 800, rules frozen first, scanned once) | **2 / 800 (0.25%)**, both false positives |
+
+Both held-out false positives were the `.php`-file-drop rule on admin code / CSS editors (a
+reused file handle, and a "create plugin" form behind `current_user_can`). They were fixed after
+the held-out run (demotions only) and have a regression fixture; the 0.25% is the honest blind
+number. No plugin in the corpus was found to contain malicious code.
 
 **Full results: [FINDINGS.md](FINDINGS.md)** (method, noise taxonomy, what surfaced).
 
@@ -143,7 +154,7 @@ one for each real incident shape:
 
 plus a request webshell, remote `eval` from a wp-cron event, `wp-config.php` exfiltration on
 activation, a login-password harvester, PHP hidden in a `.ico`, and an mu-plugin dropped from an
-open REST route. Twelve benign controls (license checker, temporary-login plugin, cache drop-in
+open REST route. Thirteen benign controls (license checker, an admin code/CSS editor, temporary-login plugin, cache drop-in
 writer, snippets plugin, white-label hide, Telegram integration, backup to Dropbox, a malware
 scanner's signature list, a vendor news footer, HTML templates, an anti-spam API, asset includes)
 must stay SAFE (the white-label one MEDIUM). Fixture hosts are `.invalid` / TEST-NET, passwords are

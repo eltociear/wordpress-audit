@@ -765,7 +765,11 @@ def _php_combos(pf, findings, info, vendor, flags):
         name = m.group(0).lower()
         if "fwrite" in name or "fputs" in name:
             h = re.match(r"\s*\$(\w+)", args[0])
-            om = h and re.search(r"\$%s\s*=\s*@?fopen\s*\(([^;]{0,300})" % re.escape(h.group(1)), tseg)
+            # the handle's most recent fopen() before this write (handles get reused)
+            rel = m.start() - (fn[1] if fn else 0)
+            oms = [x for x in re.finditer(r"\$%s\s*=\s*@?fopen\s*\(([^;]{0,300})" % re.escape(h.group(1)), tseg)
+                   if x.start() < rel] if h else []
+            om = oms[-1] if oms else None
             if not om:
                 continue
             dest, payload_arg = om.group(1).split(",")[0], args[1]
@@ -791,6 +795,14 @@ def _php_combos(pf, findings, info, vendor, flags):
             continue
         core = CORE_DIR_RE.search(dest_ctx)
         mu = re.search(r"WPMU_PLUGIN_DIR|mu-plugins", dest_ctx, re.I)
+        req_only = (re.search(REQ, pay_ctx) and not REMOTE_RE.search(pay_ctx) and not tv
+                    and not PHP_PAYLOAD_LIT_RE.search(pay_ctx))
+        if req_only and re.search(r"current_user_can\s*\(|check_admin_referer\s*\(|wp_verify_nonce\s*\(", tseg) and not core:
+            # an administrator's own file / code editor: the admin is the source, behind a capability check
+            info.append(_item("INFO", "php_drop", "Admin File Editor",
+                              "Writes a .php file from admin-submitted content behind a capability / nonce check",
+                              pf, m.start(), pf.text[m.start():m.start() + 100]))
+            continue
         where = "wp-includes" if core else ("mu-plugins" if mu else "the site's content / uploads dir")
         own = vendor and URL_RE.search(tseg) and not _external_hosts(tseg, vendor)
         findings.append(_item("HIGH" if (own and not core and not mu) else "CRITICAL",
