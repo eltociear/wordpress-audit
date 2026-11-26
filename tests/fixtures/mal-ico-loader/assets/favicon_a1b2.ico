@@ -1,0 +1,3 @@
+<?php
+// INERT TEST FIXTURE
+$x = base64_decode('ZWNobyAnQ0FOQVJZX2luZXJ0X3BheWxvYWQnOw=='); eval($x);
