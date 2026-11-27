@@ -13,6 +13,14 @@ JSON line per plugin; re-running resumes where it stopped.
 """
 import concurrent.futures as cf
 import json
+
+
+def _result(stdout):
+    """One target's result from `wordpress_audit.py --json` (family envelope since 0.2.0, bare dict before)."""
+    d = json.loads(stdout.decode("utf-8", "replace"))
+    if isinstance(d, dict) and str(d.get("schema", "")).startswith("eltociear-audit/"):
+        return d["results"][0]
+    return d
 import os
 import subprocess
 import sys
@@ -94,10 +102,10 @@ def _one(row, timeout=420):
     for attempt in range(2):
         try:
             p = subprocess.run([sys.executable, "-I", TOOL, spec, "--json"], capture_output=True, timeout=timeout)
-            r = json.loads(p.stdout.decode("utf-8", "replace"))
+            r = _result(p.stdout)
             if r.get("error") and "404" in r["error"] and row.get("version"):
                 p = subprocess.run([sys.executable, "-I", TOOL, row["slug"], "--json"], capture_output=True, timeout=timeout)
-                r = json.loads(p.stdout.decode("utf-8", "replace"))
+                r = _result(p.stdout)
             if r.get("error") and attempt == 0:
                 time.sleep(5)
                 continue
